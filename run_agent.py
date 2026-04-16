@@ -116,10 +116,12 @@ def step_enrich(scored_jobs: list[dict]) -> list[dict]:
             job["employee_count"] = e.get("employee_count")
             job["too_large"]      = e.get("too_large", False)
             job["contacts"]       = e.get("contacts", [])
+            job["apollo_url"]     = e.get("apollo_url", "")
         else:
             job.setdefault("employee_count", None)
             job.setdefault("too_large", False)
             job.setdefault("contacts", [])
+            job.setdefault("apollo_url", "")
 
     return scored_jobs
 
@@ -186,6 +188,7 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p["employee_count"] = src.get("employee_count")
             p["too_large"]      = src.get("too_large", False)
             p["contacts"]       = src.get("contacts", [])
+            p["apollo_url"]     = src.get("apollo_url", "")
             p["funding"]        = src.get("funding")
             p["tech_stack"]     = src.get("tech_stack", [])
             p["leadership"]     = src.get("leadership")
@@ -194,6 +197,7 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p.setdefault("employee_count", None)
             p.setdefault("too_large", False)
             p.setdefault("contacts", [])
+            p.setdefault("apollo_url", "")
             p.setdefault("funding", None)
             p.setdefault("tech_stack", [])
             p.setdefault("leadership", None)
