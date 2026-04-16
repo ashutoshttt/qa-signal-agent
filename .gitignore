@@ -1,4 +1,5 @@
 .env
-*.db
 *.log
 venv/
+# track jobs.db so GitHub Actions can persist dedup state
+# jobs.db is intentionally NOT ignored

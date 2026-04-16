@@ -1,0 +1,42 @@
+name: Daily QA Signal Digest
+
+on:
+  schedule:
+    - cron: "30 2 * * *"   # 8:00am IST (UTC+5:30) every day
+  workflow_dispatch:         # allow manual trigger from GitHub UI
+
+jobs:
+  run-agent:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # full history so we can commit db back
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run agent
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APOLLO_API_KEY:    ${{ secrets.APOLLO_API_KEY }}
+          EMAIL_FROM:        ${{ secrets.EMAIL_FROM }}
+          EMAIL_PASSWORD:    ${{ secrets.EMAIL_PASSWORD }}
+          EMAIL_TO:          ${{ secrets.EMAIL_TO }}
+        run: python run_agent.py
+
+      - name: Commit updated jobs.db
+        run: |
+          git config user.name  "QA Signal Bot"
+          git config user.email "bot@qa-signal-agent"
+          git add jobs.db
+          git diff --staged --quiet || git commit -m "chore: update jobs.db [skip ci]"
+          git push
