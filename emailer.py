@@ -43,6 +43,10 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
         "contacts": [],
         "employee_count": None,
         "too_large": False,
+        "funding": None,
+        "tech_stack": [],
+        "leadership": None,
+        "repeat_hiring": None,
     })
 
     for job in jobs:
@@ -60,6 +64,17 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
             g["employee_count"] = job["employee_count"]
         if job.get("too_large"):
             g["too_large"] = True
+        # Signals (take first non-null value seen for this company)
+        if job.get("funding") and not g["funding"]:
+            g["funding"] = job["funding"]
+        if job.get("tech_stack"):
+            # Merge tech stacks across jobs, keep unique
+            existing = set(g["tech_stack"])
+            g["tech_stack"] = list(existing | set(job["tech_stack"]))
+        if job.get("leadership") and not g["leadership"]:
+            g["leadership"] = job["leadership"]
+        if job.get("repeat_hiring") and not g["repeat_hiring"]:
+            g["repeat_hiring"] = job["repeat_hiring"]
 
     return sorted(
         groups.values(),
@@ -95,14 +110,58 @@ def _highlights_html(company_groups: list[dict]) -> str:
         elif g["contacts"]:
             contact_lines = []
             for c in g["contacts"][:3]:
-                name_part = f"<strong>{c['name']}</strong>" if c["name"] else "Unknown"
-                title_part = f" · {c['title']}" if c["title"] else ""
+                name_part  = f"<strong>{c['name']}</strong>" if c["name"] else "Unknown"
+                title_part = f" · {c['title']}" if c.get("title") else ""
                 email_part = f' · <a href="mailto:{c["email"]}" style="color:#2980b9;">{c["email"]}</a>' if c.get("email") else ""
-                li_part = f' · <a href="{c["linkedin_url"]}" style="color:#2980b9;">LinkedIn</a>' if c.get("linkedin_url") else ""
-                contact_lines.append(f"{name_part}{title_part}{email_part}{li_part}")
+                li_part    = f' · <a href="{c["linkedin_url"]}" style="color:#2980b9;">LinkedIn</a>' if c.get("linkedin_url") else ""
+                phone_part = f' · 📞 {c["phone"]}' if c.get("phone") else ""
+                contact_lines.append(f"{name_part}{title_part}{email_part}{phone_part}{li_part}")
             contacts_html = "<br>".join(contact_lines)
         else:
             contacts_html = '<span style="color:#bdc3c7;font-size:12px;">No contacts found</span>'
+
+        # ── Signals column ──────────────────────────────────────
+        signal_lines = []
+
+        if g.get("funding"):
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#d5f5e3;color:#1e8449;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">💰 Funding</span> '
+                f'<span style="font-size:12px;color:#555;">{g["funding"][:90]}</span>'
+                f'</div>'
+            )
+
+        if g.get("tech_stack"):
+            stack_str = " · ".join(g["tech_stack"][:6])
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#d6eaf8;color:#1a5276;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">🛠 Stack</span> '
+                f'<span style="font-size:12px;color:#555;">{stack_str}</span>'
+                f'</div>'
+            )
+
+        if g.get("leadership"):
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#fdebd0;color:#784212;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">👔 Leadership</span> '
+                f'<span style="font-size:12px;color:#555;">{g["leadership"]}</span>'
+                f'</div>'
+            )
+
+        if g.get("repeat_hiring"):
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#f9ebea;color:#922b21;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">🔁 Repeat</span> '
+                f'<span style="font-size:12px;color:#555;">{g["repeat_hiring"]}</span>'
+                f'</div>'
+            )
+
+        signals_html = "\n".join(signal_lines) if signal_lines else \
+            '<span style="color:#bdc3c7;font-size:12px;">—</span>'
 
         rows += f"""
         <tr>
@@ -121,6 +180,9 @@ def _highlights_html(company_groups: list[dict]) -> str:
             <strong style="color:{color};">{label}</strong> ({g['score']}/10)<br>
             <small style="color:#888;">{g['rationale']}</small>
           </td>
+          <td style="padding:12px 10px;border-bottom:1px solid #eee;vertical-align:top;">
+            {signals_html}
+          </td>
           <td style="padding:12px 10px;border-bottom:1px solid #eee;vertical-align:top;font-size:13px;">
             {contacts_html}
           </td>
@@ -131,11 +193,12 @@ def _highlights_html(company_groups: list[dict]) -> str:
     <table style="width:100%;border-collapse:collapse;font-size:13px;">
       <thead>
         <tr style="background:#f8f9fa;text-align:left;">
-          <th style="padding:10px;border-bottom:2px solid #ddd;width:20%;">Company</th>
-          <th style="padding:10px;border-bottom:2px solid #ddd;width:7%;text-align:center;"># Roles</th>
-          <th style="padding:10px;border-bottom:2px solid #ddd;width:25%;">Positions</th>
-          <th style="padding:10px;border-bottom:2px solid #ddd;width:18%;">Signal</th>
-          <th style="padding:10px;border-bottom:2px solid #ddd;">QA Contacts (Apollo)</th>
+          <th style="padding:10px;border-bottom:2px solid #ddd;width:18%;">Company</th>
+          <th style="padding:10px;border-bottom:2px solid #ddd;width:6%;text-align:center;"># Roles</th>
+          <th style="padding:10px;border-bottom:2px solid #ddd;width:20%;">Positions</th>
+          <th style="padding:10px;border-bottom:2px solid #ddd;width:15%;">Signal</th>
+          <th style="padding:10px;border-bottom:2px solid #ddd;width:22%;">Intel</th>
+          <th style="padding:10px;border-bottom:2px solid #ddd;">QA Contacts</th>
         </tr>
       </thead>
       <tbody>{rows}</tbody>
@@ -246,6 +309,14 @@ def _build_text(jobs: list[dict]) -> str:
         elif g["contacts"]:
             for c in g["contacts"]:
                 lines.append(f"  Contact: {c['name']} · {c['title']} · {c.get('email','')}")
+        if g.get("funding"):
+            lines.append(f"  💰 Funding: {g['funding']}")
+        if g.get("tech_stack"):
+            lines.append(f"  🛠 Stack: {', '.join(g['tech_stack'])}")
+        if g.get("leadership"):
+            lines.append(f"  👔 Leadership hiring: {g['leadership']}")
+        if g.get("repeat_hiring"):
+            lines.append(f"  🔁 Repeat hiring: {g['repeat_hiring']}")
         lines.append("")
 
     lines += ["", "ALL JOBS", "-" * 40]
