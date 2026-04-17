@@ -86,7 +86,7 @@ def _hunter_domain_search(domain: str, api_key: str) -> list[dict]:
         params={
             "domain": domain,
             "api_key": api_key,
-            "limit": 20,
+            "limit": 10,   # Free plan max is 10
         },
         timeout=15,
     )
