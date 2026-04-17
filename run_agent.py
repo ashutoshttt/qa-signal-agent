@@ -20,13 +20,14 @@ import argparse
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).parent / ".env", override=True)
 
-from scrapers import scrape_linkedin
+from scrapers import scrape_linkedin, fetch_job_description
 # from scrapers import scrape_naukri, scrape_indeed  # disabled — re-enable when ready
 from processor import score_jobs, group_by_company
 from deduplicator import init_db, filter_new, save_jobs, get_pending_digest, mark_emailed
@@ -117,11 +118,17 @@ def step_enrich(scored_jobs: list[dict]) -> list[dict]:
             job["too_large"]      = e.get("too_large", False)
             job["contacts"]       = e.get("contacts", [])
             job["apollo_url"]     = e.get("apollo_url", "")
+            job["industry"]       = e.get("industry", "")
+            job["founded_year"]   = e.get("founded_year")
+            job["funding_stage"]  = e.get("funding_stage", "")
         else:
             job.setdefault("employee_count", None)
             job.setdefault("too_large", False)
             job.setdefault("contacts", [])
             job.setdefault("apollo_url", "")
+            job.setdefault("industry", "")
+            job.setdefault("founded_year", None)
+            job.setdefault("funding_stage", "")
 
     return scored_jobs
 
@@ -140,13 +147,27 @@ def step_signals(enriched_jobs: list[dict]) -> list[dict]:
         logger.info("No companies meet signal threshold.")
         return enriched_jobs
 
+    # Fetch job descriptions for high-score companies (to extract tech stack)
+    logger.info("Fetching job descriptions for tech stack extraction …")
+    company_descriptions: dict[str, list[str]] = {}
+    for name, jobs in companies_to_signal.items():
+        descs = []
+        for job in jobs[:3]:   # max 3 descriptions per company
+            desc = fetch_job_description(job["link"])
+            if desc:
+                descs.append(desc)
+            time.sleep(1)
+        company_descriptions[name] = descs
+        logger.info("  %s: %d description(s) fetched", name, len(descs))
+
     # Build enrichment stubs from existing job data
     enrichment_stubs = {}
     for name, jobs in companies_to_signal.items():
         job0 = jobs[0]
         enrichment_stubs[name] = {
-            "apollo_url": job0.get("apollo_url", ""),
-            "employee_count": job0.get("employee_count"),
+            "apollo_url":       job0.get("apollo_url", ""),
+            "employee_count":   job0.get("employee_count"),
+            "job_descriptions": company_descriptions.get(name, []),
         }
 
     logger.info("Running signals for %d companies …", len(enrichment_stubs))
@@ -189,6 +210,9 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p["too_large"]      = src.get("too_large", False)
             p["contacts"]       = src.get("contacts", [])
             p["apollo_url"]     = src.get("apollo_url", "")
+            p["industry"]       = src.get("industry", "")
+            p["founded_year"]   = src.get("founded_year")
+            p["funding_stage"]  = src.get("funding_stage", "")
             p["funding"]        = src.get("funding")
             p["tech_stack"]     = src.get("tech_stack", [])
             p["leadership"]     = src.get("leadership")
@@ -198,6 +222,9 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p.setdefault("too_large", False)
             p.setdefault("contacts", [])
             p.setdefault("apollo_url", "")
+            p.setdefault("industry", "")
+            p.setdefault("founded_year", None)
+            p.setdefault("funding_stage", "")
             p.setdefault("funding", None)
             p.setdefault("tech_stack", [])
             p.setdefault("leadership", None)

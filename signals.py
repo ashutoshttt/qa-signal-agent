@@ -139,7 +139,79 @@ def get_funding_signal(company_name: str) -> Optional[str]:
         return None
 
 
-# ── Signal 2: Tech Stack ───────────────────────────────────────────────────────
+# ── Signal 2: Product / Growth News ───────────────────────────────────────────
+
+def get_product_signal(company_name: str) -> Optional[str]:
+    """
+    Search Google News RSS for product launches, growth, or expansion news.
+    Returns a headline string or None.
+    """
+    PRODUCT_KEYWORDS = [
+        "launch", "launches", "launched", "release", "releases",
+        "expands", "expansion", "growth", "new product", "new feature",
+        "partnership", "announces", "unveiled",
+    ]
+    try:
+        query = f'"{company_name}" launch OR release OR expansion OR growth OR announces'
+        url = (
+            "https://news.google.com/rss/search"
+            f"?q={requests.utils.quote(query)}"
+            "&hl=en-IN&gl=IN&ceid=IN:en"
+        )
+        resp = requests.get(url, headers=HEADERS, timeout=10)
+        if resp.status_code != 200:
+            return None
+
+        root = ET.fromstring(resp.text)
+        items = root.findall(".//item")
+        cutoff = datetime.now(timezone.utc) - timedelta(days=180)
+
+        for item in items[:10]:
+            title   = item.findtext("title", "").strip()
+            pub_raw = item.findtext("pubDate", "")
+
+            # Strip source suffix before matching
+            headline_only = re.sub(r"\s*[-–]\s*[^-–]+$", "", title).strip()
+            title_lower = headline_only.lower()
+
+            if company_name.lower() not in title_lower:
+                continue
+            if not any(kw in title_lower for kw in PRODUCT_KEYWORDS):
+                continue
+
+            try:
+                pub_dt = datetime.strptime(pub_raw[:25], "%a, %d %b %Y %H:%M")
+                pub_dt = pub_dt.replace(tzinfo=timezone.utc)
+                if pub_dt < cutoff:
+                    continue
+                date_str = pub_dt.strftime("%b %Y")
+            except Exception:
+                date_str = ""
+
+            return f"{headline_only[:100]} ({date_str})" if date_str else headline_only[:110]
+
+        return None
+    except Exception as e:
+        logger.debug("Product signal failed for '%s': %s", company_name, e)
+        return None
+
+
+# ── Signal 3: Tech Stack ───────────────────────────────────────────────────────
+
+def get_tech_stack_from_description(description: str) -> list[str]:
+    """
+    Parse a job description text for known tech/tool mentions.
+    More reliable than website scraping — job postings explicitly list required tools.
+    """
+    if not description:
+        return []
+    detected = []
+    content = description.lower()
+    for tech, patterns in TECH_PATTERNS.items():
+        if any(re.search(p, content, re.IGNORECASE) for p in patterns):
+            detected.append(tech)
+    return detected
+
 
 def get_tech_stack(website_url: str) -> list[str]:
     """
@@ -266,35 +338,52 @@ def enrich_signals(company_groups: dict[str, dict]) -> dict[str, dict]:
     """
     Add signals to each company's enrichment dict.
 
-    Input:  {company_name: enrichment_dict}  (from apollo.enrich_companies)
+    Input:  {company_name: enrichment_dict}
+      enrichment_dict may include:
+        - apollo_url:       company website (from Apollo)
+        - job_descriptions: list[str] of raw description texts for that company's jobs
     Output: same dict with added keys:
-      - funding:          str or None
-      - tech_stack:       list[str]
-      - leadership:       str or None
-      - repeat_hiring:    str or None
+      - funding:          str or None   (Google News RSS)
+      - product:          str or None   (Google News RSS — launches/growth)
+      - tech_stack:       list[str]     (from job descriptions + website)
+      - leadership:       str or None   (from jobs.db)
+      - repeat_hiring:    str or None   (from jobs.db)
     """
     results = {}
 
     for i, (company_name, enrichment) in enumerate(company_groups.items(), 1):
-        logger.info(
-            "Signals %d/%d: %s", i, len(company_groups), company_name
-        )
-        website = enrichment.get("apollo_url", "")
+        logger.info("Signals %d/%d: %s", i, len(company_groups), company_name)
+        website      = enrichment.get("apollo_url", "")
+        descriptions = enrichment.get("job_descriptions", [])
 
-        # Run all signals
+        # Tech stack: parse job descriptions first (most reliable), fallback to website
+        tech_from_desc = []
+        for desc in descriptions:
+            for t in get_tech_stack_from_description(desc):
+                if t not in tech_from_desc:
+                    tech_from_desc.append(t)
+
+        tech_from_web = get_tech_stack(website) if website else []
+
+        # Merge — description findings take priority, then add any extras from website
+        tech_stack = tech_from_desc + [t for t in tech_from_web if t not in tech_from_desc]
+
+        # Other signals
         funding       = get_funding_signal(company_name)
-        tech_stack    = get_tech_stack(website) if website else []
+        product       = get_product_signal(company_name)
         leadership    = get_leadership_signal(company_name)
         repeat_hiring = get_repeat_hiring_signal(company_name)
 
         enrichment["funding"]       = funding
+        enrichment["product"]       = product
         enrichment["tech_stack"]    = tech_stack
         enrichment["leadership"]    = leadership
         enrichment["repeat_hiring"] = repeat_hiring
 
         logger.info(
-            "  funding=%s | stack=%s | leadership=%s | repeat=%s",
+            "  funding=%s | product=%s | stack=%d | leadership=%s | repeat=%s",
             "✓" if funding else "-",
+            "✓" if product else "-",
             len(tech_stack),
             "✓" if leadership else "-",
             "✓" if repeat_hiring else "-",

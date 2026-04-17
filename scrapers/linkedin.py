@@ -82,6 +82,28 @@ def _parse_jobs(html: str, keyword: str) -> list[dict]:
     return jobs
 
 
+def fetch_job_description(link: str, session: Optional[requests.Session] = None) -> str:
+    """
+    Fetch the full description text for a single LinkedIn job page.
+    Returns plain text or empty string on failure.
+    Used to extract tech stack keywords for high-priority companies.
+    """
+    try:
+        s = session or requests.Session()
+        resp = s.get(link, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return ""
+        soup = BeautifulSoup(resp.text, "lxml")
+        desc_el = soup.select_one(
+            "div.description__text, div.show-more-less-html__markup, "
+            "section.description div"
+        )
+        return desc_el.get_text(separator=" ", strip=True) if desc_el else ""
+    except Exception as e:
+        logger.debug("Failed to fetch job description for %s: %s", link, e)
+        return ""
+
+
 def scrape_linkedin() -> list[dict]:
     """Scrape LinkedIn Jobs for QA roles in India. Returns list of job dicts."""
     all_jobs = []

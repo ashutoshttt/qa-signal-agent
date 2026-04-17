@@ -1,5 +1,5 @@
-from .linkedin import scrape_linkedin
+from .linkedin import scrape_linkedin, fetch_job_description
 # from .naukri import scrape_naukri   # disabled — JS-rendered, re-enable when ready
 # from .indeed import scrape_indeed   # disabled — blocks scrapers, re-enable when ready
 
-__all__ = ["scrape_linkedin"]
+__all__ = ["scrape_linkedin", "fetch_job_description"]

@@ -43,7 +43,11 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
         "contacts": [],
         "employee_count": None,
         "too_large": False,
+        "industry": "",
+        "founded_year": None,
+        "funding_stage": "",
         "funding": None,
+        "product": None,
         "tech_stack": [],
         "leadership": None,
         "repeat_hiring": None,
@@ -64,6 +68,12 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
             g["employee_count"] = job["employee_count"]
         if job.get("too_large"):
             g["too_large"] = True
+        if job.get("industry") and not g["industry"]:
+            g["industry"] = job["industry"]
+        if job.get("founded_year") and not g["founded_year"]:
+            g["founded_year"] = job["founded_year"]
+        if job.get("funding_stage") and not g["funding_stage"]:
+            g["funding_stage"] = job["funding_stage"]
         # Signals (take first non-null value seen for this company)
         if job.get("funding") and not g["funding"]:
             g["funding"] = job["funding"]
@@ -75,6 +85,8 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
             g["leadership"] = job["leadership"]
         if job.get("repeat_hiring") and not g["repeat_hiring"]:
             g["repeat_hiring"] = job["repeat_hiring"]
+        if job.get("product") and not g["product"]:
+            g["product"] = job["product"]
 
     return sorted(
         groups.values(),
@@ -95,14 +107,32 @@ def _highlights_html(company_groups: list[dict]) -> str:
         else:
             roles_str = ", ".join(g["roles"][:3]) + f" +{role_count - 3} more"
 
-        # Employee count badge
+        # Employee count + industry + funding stage + founded year badges
+        meta_parts = []
         if g["employee_count"]:
-            emp = f"{g['employee_count']:,}"
-            emp_badge = f'<span style="background:#ecf0f1;padding:2px 6px;border-radius:3px;font-size:11px;">{emp} employees</span>'
+            meta_parts.append(
+                f'<span style="background:#ecf0f1;padding:2px 6px;border-radius:3px;font-size:11px;">'
+                f'{g["employee_count"]:,} employees</span>'
+            )
         elif g["too_large"]:
-            emp_badge = '<span style="background:#fadbd8;padding:2px 6px;border-radius:3px;font-size:11px;">Large (skipped)</span>'
-        else:
-            emp_badge = '<span style="color:#bdc3c7;font-size:11px;">size unknown</span>'
+            meta_parts.append(
+                '<span style="background:#fadbd8;padding:2px 6px;border-radius:3px;font-size:11px;">Large MNC</span>'
+            )
+        if g.get("industry"):
+            meta_parts.append(
+                f'<span style="background:#eaf4fb;color:#1a5276;padding:2px 6px;border-radius:3px;font-size:11px;">'
+                f'{g["industry"]}</span>'
+            )
+        if g.get("funding_stage"):
+            meta_parts.append(
+                f'<span style="background:#fef9e7;color:#7d6608;padding:2px 6px;border-radius:3px;font-size:11px;">'
+                f'{g["funding_stage"]}</span>'
+            )
+        if g.get("founded_year"):
+            meta_parts.append(
+                f'<span style="color:#aab7b8;font-size:11px;">est. {g["founded_year"]}</span>'
+            )
+        emp_badge = " ".join(meta_parts) if meta_parts else '<span style="color:#bdc3c7;font-size:11px;">size unknown</span>'
 
         # Contacts
         if g["too_large"]:
@@ -157,6 +187,15 @@ def _highlights_html(company_groups: list[dict]) -> str:
                 f'<span style="background:#f9ebea;color:#922b21;padding:2px 6px;'
                 f'border-radius:3px;font-size:11px;font-weight:600;">🔁 Repeat</span> '
                 f'<span style="font-size:12px;color:#555;">{g["repeat_hiring"]}</span>'
+                f'</div>'
+            )
+
+        if g.get("product"):
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#e8daef;color:#6c3483;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">🚀 Product</span> '
+                f'<span style="font-size:12px;color:#555;">{g["product"][:90]}</span>'
                 f'</div>'
             )
 
@@ -304,6 +343,12 @@ def _build_text(jobs: list[dict]) -> str:
         ]
         if g["employee_count"]:
             lines.append(f"  Employees: {g['employee_count']:,}")
+        if g.get("industry"):
+            lines.append(f"  Industry: {g['industry']}")
+        if g.get("funding_stage"):
+            lines.append(f"  Stage: {g['funding_stage']}")
+        if g.get("founded_year"):
+            lines.append(f"  Founded: {g['founded_year']}")
         if g["too_large"]:
             lines.append("  Apollo: skipped (large company)")
         elif g["contacts"]:
@@ -317,6 +362,8 @@ def _build_text(jobs: list[dict]) -> str:
             lines.append(f"  👔 Leadership hiring: {g['leadership']}")
         if g.get("repeat_hiring"):
             lines.append(f"  🔁 Repeat hiring: {g['repeat_hiring']}")
+        if g.get("product"):
+            lines.append(f"  🚀 Product: {g['product']}")
         lines.append("")
 
     lines += ["", "ALL JOBS", "-" * 40]
