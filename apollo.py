@@ -231,10 +231,11 @@ def enrich_companies(company_groups: dict[str, list[dict]]) -> dict[str, dict]:
                     enrichment["industry"]        = org.get("industry", "") or ""
                     enrichment["founded_year"]    = org.get("founded_year") or org.get("year_founded")
                     enrichment["funding_stage"]   = org.get("latest_funding_stage") or org.get("funding_stage") or ""
+                    website_url = org.get("website_url") or ""
                     domain = (
                         org.get("primary_domain")
-                        or org.get("website_url", "").replace("https://", "").replace("http://", "").split("/")[0]
-                    )
+                        or website_url.replace("https://", "").replace("http://", "").split("/")[0]
+                    ) or None
 
                     if employee_count and employee_count > LARGE_COMPANY_THRESHOLD:
                         logger.info("'%s' has %d employees — skipping", company_name, employee_count)
