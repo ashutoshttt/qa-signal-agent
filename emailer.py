@@ -51,6 +51,7 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
         "tech_stack": [],
         "leadership": None,
         "repeat_hiring": None,
+        "ai_mentions": [],
     })
 
     for job in jobs:
@@ -87,6 +88,12 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
             g["repeat_hiring"] = job["repeat_hiring"]
         if job.get("product") and not g["product"]:
             g["product"] = job["product"]
+        if job.get("ai_mentions"):
+            existing = set(g["ai_mentions"])
+            for m in job["ai_mentions"]:
+                if m not in existing:
+                    g["ai_mentions"].append(m)
+                    existing.add(m)
 
     return sorted(
         groups.values(),
@@ -196,6 +203,21 @@ def _highlights_html(company_groups: list[dict]) -> str:
                 f'<span style="background:#e8daef;color:#6c3483;padding:2px 6px;'
                 f'border-radius:3px;font-size:11px;font-weight:600;">🚀 Product</span> '
                 f'<span style="font-size:12px;color:#555;">{g["product"][:90]}</span>'
+                f'</div>'
+            )
+
+        if g.get("ai_mentions"):
+            snippets_html = "".join(
+                f'<div style="margin-top:3px;padding:4px 6px;background:#f4f6f7;'
+                f'border-left:3px solid #8e44ad;font-size:11px;color:#444;'
+                f'font-style:italic;">{m}</div>'
+                for m in g["ai_mentions"][:3]
+            )
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#f0e6ff;color:#6c3483;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">🤖 AI in JD</span>'
+                f'{snippets_html}'
                 f'</div>'
             )
 
@@ -364,6 +386,8 @@ def _build_text(jobs: list[dict]) -> str:
             lines.append(f"  🔁 Repeat hiring: {g['repeat_hiring']}")
         if g.get("product"):
             lines.append(f"  🚀 Product: {g['product']}")
+        if g.get("ai_mentions"):
+            lines.append(f"  🤖 AI in JD: {g['ai_mentions'][0]}")
         lines.append("")
 
     lines += ["", "ALL JOBS", "-" * 40]

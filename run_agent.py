@@ -179,14 +179,18 @@ def step_signals(enriched_jobs: list[dict]) -> list[dict]:
         if company in signalled:
             s = signalled[company]
             job["funding"]       = s.get("funding")
+            job["product"]       = s.get("product")
             job["tech_stack"]    = s.get("tech_stack", [])
             job["leadership"]    = s.get("leadership")
             job["repeat_hiring"] = s.get("repeat_hiring")
+            job["ai_mentions"]   = s.get("ai_mentions", [])
         else:
             job.setdefault("funding", None)
+            job.setdefault("product", None)
             job.setdefault("tech_stack", [])
             job.setdefault("leadership", None)
             job.setdefault("repeat_hiring", None)
+            job.setdefault("ai_mentions", [])
 
     return enriched_jobs
 
@@ -214,9 +218,11 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p["founded_year"]   = src.get("founded_year")
             p["funding_stage"]  = src.get("funding_stage", "")
             p["funding"]        = src.get("funding")
+            p["product"]        = src.get("product")
             p["tech_stack"]     = src.get("tech_stack", [])
             p["leadership"]     = src.get("leadership")
             p["repeat_hiring"]  = src.get("repeat_hiring")
+            p["ai_mentions"]    = src.get("ai_mentions", [])
         else:
             p.setdefault("employee_count", None)
             p.setdefault("too_large", False)
@@ -226,9 +232,11 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p.setdefault("founded_year", None)
             p.setdefault("funding_stage", "")
             p.setdefault("funding", None)
+            p.setdefault("product", None)
             p.setdefault("tech_stack", [])
             p.setdefault("leadership", None)
             p.setdefault("repeat_hiring", None)
+            p.setdefault("ai_mentions", [])
 
     if dry_run:
         logger.info("DRY RUN — would send %d jobs:", len(pending))

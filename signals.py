@@ -196,6 +196,50 @@ def get_product_signal(company_name: str) -> Optional[str]:
         return None
 
 
+# ── AI mentions in job descriptions ───────────────────────────────────────────
+
+AI_PATTERNS = [
+    r"\bai\b", r"artificial intelligence", r"machine learning", r"\bml\b",
+    r"large language model", r"\bllm\b", r"generative ai", r"gen.?ai",
+    r"gpt", r"chatgpt", r"copilot", r"nlp", r"natural language processing",
+    r"deep learning", r"neural network", r"computer vision", r"\brag\b",
+    r"vector (search|database|store)", r"embedding", r"fine.?tun",
+    r"ai.powered", r"ai.driven", r"ai.enabled", r"ai.first",
+    r"test(ing)? (ai|ml|llm)", r"ai (testing|validation|quality)",
+]
+
+
+def get_ai_mentions(descriptions: list[str]) -> list[str]:
+    """
+    Scan job description texts for AI-related mentions.
+    Returns up to 3 unique sentences/phrases that contain AI keywords.
+    """
+    if not descriptions:
+        return []
+
+    found_sentences = []
+    seen = set()
+
+    for desc in descriptions:
+        # Split into sentences on . ! ? or newlines
+        sentences = re.split(r"(?<=[.!?])\s+|\n+", desc)
+        for sentence in sentences:
+            s_lower = sentence.lower().strip()
+            if len(s_lower) < 15:
+                continue
+            if any(re.search(p, s_lower) for p in AI_PATTERNS):
+                # Normalise whitespace and truncate
+                clean = re.sub(r"\s+", " ", sentence).strip()
+                clean_key = clean.lower()[:80]
+                if clean_key not in seen:
+                    seen.add(clean_key)
+                    found_sentences.append(clean[:160])
+                if len(found_sentences) >= 3:
+                    return found_sentences
+
+    return found_sentences
+
+
 # ── Signal 3: Tech Stack ───────────────────────────────────────────────────────
 
 def get_tech_stack_from_description(description: str) -> list[str]:
@@ -373,18 +417,21 @@ def enrich_signals(company_groups: dict[str, dict]) -> dict[str, dict]:
         product       = get_product_signal(company_name)
         leadership    = get_leadership_signal(company_name)
         repeat_hiring = get_repeat_hiring_signal(company_name)
+        ai_mentions   = get_ai_mentions(descriptions)
 
         enrichment["funding"]       = funding
         enrichment["product"]       = product
         enrichment["tech_stack"]    = tech_stack
         enrichment["leadership"]    = leadership
         enrichment["repeat_hiring"] = repeat_hiring
+        enrichment["ai_mentions"]   = ai_mentions
 
         logger.info(
-            "  funding=%s | product=%s | stack=%d | leadership=%s | repeat=%s",
+            "  funding=%s | product=%s | stack=%d | ai=%d | leadership=%s | repeat=%s",
             "✓" if funding else "-",
             "✓" if product else "-",
             len(tech_stack),
+            len(ai_mentions),
             "✓" if leadership else "-",
             "✓" if repeat_hiring else "-",
         )
