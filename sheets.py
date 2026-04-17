@@ -70,7 +70,7 @@ def _group_by_company(jobs: list[dict]) -> list[dict]:
         if job.get("contacts"):
             g["contacts"] = job["contacts"]
 
-    return sorted(groups.values(), key=lambda x: (len(x["roles"]), x["score"]), reverse=True)
+    return sorted(groups.values(), key=lambda x: (x["score"], len(x["roles"])), reverse=True)
 
 
 def _build_rows(jobs: list[dict]) -> list[dict]:
