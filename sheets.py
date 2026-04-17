@@ -15,6 +15,7 @@ Setup:
 import logging
 import os
 import json
+import time
 import requests
 from datetime import date
 from collections import defaultdict
@@ -128,20 +129,34 @@ def log_to_sheets(jobs: list[dict]) -> bool:
     rows = _build_rows(jobs)
     logger.info("Logging %d company rows to Google Sheets …", len(rows))
 
+    BATCH_SIZE = 20  # Apps Script times out on large payloads — 20 rows is safe
+    total_written = 0
+
     try:
-        resp = requests.post(
-            url,
-            json={"rows": rows},
-            headers={"Content-Type": "application/json"},
-            timeout=30,
-        )
-        if resp.status_code == 200:
-            result = resp.json() if resp.text else {}
-            logger.info("Sheets: %s rows written", result.get("written", len(rows)))
-            return True
-        else:
-            logger.error("Sheets POST failed: %s %s", resp.status_code, resp.text[:200])
-            return False
+        for i in range(0, len(rows), BATCH_SIZE):
+            batch = rows[i: i + BATCH_SIZE]
+            resp = requests.post(
+                url,
+                json={"rows": batch},
+                headers={"Content-Type": "application/json"},
+                timeout=60,
+            )
+            if resp.status_code == 200:
+                result = resp.json() if resp.text else {}
+                total_written += result.get("written", len(batch))
+                logger.info(
+                    "Sheets batch %d/%d: %d rows written",
+                    i // BATCH_SIZE + 1,
+                    -(-len(rows) // BATCH_SIZE),
+                    result.get("written", len(batch)),
+                )
+                time.sleep(3)  # polite pause between batches
+            else:
+                logger.error("Sheets batch failed: %s %s", resp.status_code, resp.text[:200])
+                return False
+
+        logger.info("Sheets: %d total rows written", total_written)
+        return True
 
     except Exception as e:
         logger.error("Sheets logging failed: %s", e)
