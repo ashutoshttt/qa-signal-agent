@@ -34,6 +34,7 @@ from deduplicator import init_db, filter_new, save_jobs, get_pending_digest, mar
 from apollo import enrich_companies
 from signals import enrich_signals
 from emailer import send_digest
+from sheets import log_to_sheets
 
 # ── Logging ────────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -286,6 +287,13 @@ def main() -> None:
     enriched    = step_enrich(scored_jobs)
     signalled   = step_signals(enriched)
     step_email(signalled, dry_run=args.dry_run)
+
+    # Log to Google Sheets (non-blocking — failure won't break the run)
+    if not args.dry_run:
+        try:
+            log_to_sheets(signalled)
+        except Exception as e:
+            logger.error("Sheets logging failed (non-fatal): %s", e)
 
     logger.info("── Done ────────────────────────────────────────────")
 

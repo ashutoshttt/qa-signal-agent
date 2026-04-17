@@ -28,6 +28,8 @@ jobs:
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           APOLLO_API_KEY:    ${{ secrets.APOLLO_API_KEY }}
+          HUNTER_API_KEY:    ${{ secrets.HUNTER_API_KEY }}
+          GOOGLE_SHEET_URL:  ${{ secrets.GOOGLE_SHEET_URL }}
           EMAIL_FROM:        ${{ secrets.EMAIL_FROM }}
           EMAIL_PASSWORD:    ${{ secrets.EMAIL_PASSWORD }}
           EMAIL_TO:          ${{ secrets.EMAIL_TO }}
