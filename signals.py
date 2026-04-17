@@ -338,7 +338,116 @@ def get_leadership_signal(company_name: str) -> Optional[str]:
         return None
 
 
-# ── Signal 4: Repeat Hiring (hiring QA repeatedly = scaling) ──────────────────
+# ── Signal 4: Hiring Velocity (total open LinkedIn roles) ─────────────────────
+
+def get_hiring_velocity(company_name: str) -> Optional[str]:
+    """
+    Search LinkedIn for ALL open roles at this company (not just QA).
+    A company with 30+ total openings is aggressively scaling.
+    Returns e.g. "47+ open roles (rapidly scaling)" or None.
+    """
+    try:
+        url = (
+            "https://www.linkedin.com/jobs/search/"
+            f"?keywords={requests.utils.quote(company_name)}"
+            "&location=India"
+        )
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(resp.text, "lxml")
+
+        # Try the result-count header first
+        count_el = soup.select_one(
+            "span.results-context-header__job-count, "
+            "h1.results-context-header__query-search, "
+            "span.jobs-search__total-count"
+        )
+        count = 0
+        if count_el:
+            text = count_el.get_text(strip=True)
+            m = re.search(r"([\d,]+)", text)
+            if m:
+                count = int(m.group(1).replace(",", ""))
+
+        # Fallback: count job cards on the page
+        if count == 0:
+            cards = soup.select("div.base-card, li.jobs-search__results-list > div")
+            count = len(cards)
+
+        if count >= 5:
+            label = "rapidly scaling" if count >= 30 else "actively hiring"
+            return f"{count}+ open roles on LinkedIn ({label})"
+        return None
+
+    except Exception as e:
+        logger.debug("Hiring velocity failed for '%s': %s", company_name, e)
+        return None
+
+
+# ── Signal 5: Leadership Hiring on LinkedIn (live org build-out signal) ────────
+
+def get_linkedin_leadership(company_name: str) -> Optional[str]:
+    """
+    Search LinkedIn for leadership roles (VP, CTO, Head of Eng) currently open
+    at this company. Leadership + QA hiring simultaneously = org build-out, not backfill.
+    Returns e.g. "Hiring: VP Engineering, Head of Product" or None.
+    """
+    LEADERSHIP_KEYWORDS = [
+        "vp", "vice president", "cto", "chief technology",
+        "head of engineering", "head of product", "director of engineering",
+        "engineering director", "vp product", "chief product officer",
+        "chief operating", "vp technology",
+    ]
+    try:
+        query = (
+            f'{company_name} "VP Engineering" OR CTO OR '
+            '"Head of Engineering" OR "VP Product" OR "Head of Product"'
+        )
+        url = (
+            "https://www.linkedin.com/jobs/search/"
+            f"?keywords={requests.utils.quote(query)}"
+            "&location=India"
+        )
+        resp = requests.get(url, headers=HEADERS, timeout=15)
+        if resp.status_code != 200:
+            return None
+
+        soup = BeautifulSoup(resp.text, "lxml")
+        cards = soup.select("div.base-card, li.jobs-search__results-list > div")
+
+        found_titles: list[str] = []
+        seen: set[str] = set()
+
+        for card in cards[:15]:
+            title_el   = card.select_one("h3.base-search-card__title, h3.result-card__title")
+            company_el = card.select_one("h4.base-search-card__subtitle, h4.result-card__subtitle")
+            if not title_el or not company_el:
+                continue
+
+            title        = title_el.get_text(strip=True)
+            card_company = company_el.get_text(strip=True)
+
+            # Only count roles that actually belong to this company
+            if company_name.lower() not in card_company.lower():
+                continue
+
+            title_lower = title.lower()
+            if any(kw in title_lower for kw in LEADERSHIP_KEYWORDS) and title not in seen:
+                seen.add(title)
+                found_titles.append(title)
+
+        if found_titles:
+            return "Hiring: " + ", ".join(found_titles[:3])
+        return None
+
+    except Exception as e:
+        logger.debug("LinkedIn leadership failed for '%s': %s", company_name, e)
+        return None
+
+
+# ── Signal 6: Repeat Hiring (hiring QA repeatedly = scaling) ──────────────────
 
 def get_repeat_hiring_signal(company_name: str) -> Optional[str]:
     """
@@ -387,11 +496,14 @@ def enrich_signals(company_groups: dict[str, dict]) -> dict[str, dict]:
         - apollo_url:       company website (from Apollo)
         - job_descriptions: list[str] of raw description texts for that company's jobs
     Output: same dict with added keys:
-      - funding:          str or None   (Google News RSS)
-      - product:          str or None   (Google News RSS — launches/growth)
-      - tech_stack:       list[str]     (from job descriptions + website)
-      - leadership:       str or None   (from jobs.db)
-      - repeat_hiring:    str or None   (from jobs.db)
+      - funding:             str or None   (Google News RSS)
+      - product:             str or None   (Google News RSS — launches/growth)
+      - tech_stack:          list[str]     (from job descriptions + website)
+      - ai_mentions:         list[str]     (AI sentences from job descriptions)
+      - leadership:          str or None   (from jobs.db — historical)
+      - repeat_hiring:       str or None   (from jobs.db)
+      - hiring_velocity:     str or None   (LinkedIn total open roles)
+      - linkedin_leadership: str or None   (LinkedIn active leadership search)
     """
     results = {}
 
@@ -412,31 +524,38 @@ def enrich_signals(company_groups: dict[str, dict]) -> dict[str, dict]:
         # Merge — description findings take priority, then add any extras from website
         tech_stack = tech_from_desc + [t for t in tech_from_web if t not in tech_from_desc]
 
-        # Other signals
-        funding       = get_funding_signal(company_name)
-        product       = get_product_signal(company_name)
-        leadership    = get_leadership_signal(company_name)
-        repeat_hiring = get_repeat_hiring_signal(company_name)
-        ai_mentions   = get_ai_mentions(descriptions)
+        # Signals
+        funding             = get_funding_signal(company_name)
+        product             = get_product_signal(company_name)
+        leadership          = get_leadership_signal(company_name)
+        repeat_hiring       = get_repeat_hiring_signal(company_name)
+        ai_mentions         = get_ai_mentions(descriptions)
+        hiring_velocity     = get_hiring_velocity(company_name)
+        linkedin_leadership = get_linkedin_leadership(company_name)
 
-        enrichment["funding"]       = funding
-        enrichment["product"]       = product
-        enrichment["tech_stack"]    = tech_stack
-        enrichment["leadership"]    = leadership
-        enrichment["repeat_hiring"] = repeat_hiring
-        enrichment["ai_mentions"]   = ai_mentions
+        enrichment["funding"]             = funding
+        enrichment["product"]             = product
+        enrichment["tech_stack"]          = tech_stack
+        enrichment["leadership"]          = leadership
+        enrichment["repeat_hiring"]       = repeat_hiring
+        enrichment["ai_mentions"]         = ai_mentions
+        enrichment["hiring_velocity"]     = hiring_velocity
+        enrichment["linkedin_leadership"] = linkedin_leadership
 
         logger.info(
-            "  funding=%s | product=%s | stack=%d | ai=%d | leadership=%s | repeat=%s",
+            "  funding=%s | product=%s | stack=%d | ai=%d | "
+            "leadership=%s | repeat=%s | velocity=%s | li_leadership=%s",
             "✓" if funding else "-",
             "✓" if product else "-",
             len(tech_stack),
             len(ai_mentions),
             "✓" if leadership else "-",
             "✓" if repeat_hiring else "-",
+            "✓" if hiring_velocity else "-",
+            "✓" if linkedin_leadership else "-",
         )
 
         results[company_name] = enrichment
-        time.sleep(1.5)   # polite delay between companies
+        time.sleep(2)   # polite delay — 2 extra LinkedIn calls per company
 
     return results

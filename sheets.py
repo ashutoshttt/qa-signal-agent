@@ -40,6 +40,8 @@ def _group_by_company(jobs: list[dict]) -> list[dict]:
         "ai_mentions": [],
         "leadership": None,
         "repeat_hiring": None,
+        "hiring_velocity": None,
+        "linkedin_leadership": None,
         "contacts": [],
     })
 
@@ -58,6 +60,8 @@ def _group_by_company(jobs: list[dict]) -> list[dict]:
         g["product"] = g["product"] or job.get("product")
         g["leadership"] = g["leadership"] or job.get("leadership")
         g["repeat_hiring"] = g["repeat_hiring"] or job.get("repeat_hiring")
+        g["hiring_velocity"] = g["hiring_velocity"] or job.get("hiring_velocity")
+        g["linkedin_leadership"] = g["linkedin_leadership"] or job.get("linkedin_leadership")
 
         if job.get("tech_stack"):
             existing = set(g["tech_stack"])
@@ -104,9 +108,11 @@ def _build_rows(jobs: list[dict]) -> list[dict]:
             "product_news":   g["product"] or "",
             "tech_stack":     ", ".join(g["tech_stack"]),
             "ai_signal":      ai_signal,
-            "leadership":     g["leadership"] or "",
-            "repeat_hiring":  g["repeat_hiring"] or "",
-            "contacts":       " | ".join(contact_strs),
+            "leadership":          g["leadership"] or "",
+            "repeat_hiring":       g["repeat_hiring"] or "",
+            "hiring_velocity":     g["hiring_velocity"] or "",
+            "linkedin_leadership": g["linkedin_leadership"] or "",
+            "contacts":            " | ".join(contact_strs),
         })
 
     return rows

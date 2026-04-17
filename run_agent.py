@@ -30,7 +30,7 @@ load_dotenv(Path(__file__).parent / ".env", override=True)
 from scrapers import scrape_linkedin, fetch_job_description
 # from scrapers import scrape_naukri, scrape_indeed  # disabled — re-enable when ready
 from processor import score_jobs, group_by_company
-from deduplicator import init_db, filter_new, save_jobs, get_pending_digest, mark_emailed
+from deduplicator import init_db, filter_new, save_jobs, save_enrichment, get_pending_digest, mark_emailed
 from apollo import enrich_companies
 from signals import enrich_signals
 from emailer import send_digest
@@ -179,12 +179,14 @@ def step_signals(enriched_jobs: list[dict]) -> list[dict]:
         company = job["company"]
         if company in signalled:
             s = signalled[company]
-            job["funding"]       = s.get("funding")
-            job["product"]       = s.get("product")
-            job["tech_stack"]    = s.get("tech_stack", [])
-            job["leadership"]    = s.get("leadership")
-            job["repeat_hiring"] = s.get("repeat_hiring")
-            job["ai_mentions"]   = s.get("ai_mentions", [])
+            job["funding"]             = s.get("funding")
+            job["product"]             = s.get("product")
+            job["tech_stack"]          = s.get("tech_stack", [])
+            job["leadership"]          = s.get("leadership")
+            job["repeat_hiring"]       = s.get("repeat_hiring")
+            job["ai_mentions"]         = s.get("ai_mentions", [])
+            job["hiring_velocity"]     = s.get("hiring_velocity")
+            job["linkedin_leadership"] = s.get("linkedin_leadership")
         else:
             job.setdefault("funding", None)
             job.setdefault("product", None)
@@ -192,6 +194,8 @@ def step_signals(enriched_jobs: list[dict]) -> list[dict]:
             job.setdefault("leadership", None)
             job.setdefault("repeat_hiring", None)
             job.setdefault("ai_mentions", [])
+            job.setdefault("hiring_velocity", None)
+            job.setdefault("linkedin_leadership", None)
 
     return enriched_jobs
 
@@ -218,12 +222,14 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p["industry"]       = src.get("industry", "")
             p["founded_year"]   = src.get("founded_year")
             p["funding_stage"]  = src.get("funding_stage", "")
-            p["funding"]        = src.get("funding")
-            p["product"]        = src.get("product")
-            p["tech_stack"]     = src.get("tech_stack", [])
-            p["leadership"]     = src.get("leadership")
-            p["repeat_hiring"]  = src.get("repeat_hiring")
-            p["ai_mentions"]    = src.get("ai_mentions", [])
+            p["funding"]             = src.get("funding")
+            p["product"]             = src.get("product")
+            p["tech_stack"]          = src.get("tech_stack", [])
+            p["leadership"]          = src.get("leadership")
+            p["repeat_hiring"]       = src.get("repeat_hiring")
+            p["ai_mentions"]         = src.get("ai_mentions", [])
+            p["hiring_velocity"]     = src.get("hiring_velocity")
+            p["linkedin_leadership"] = src.get("linkedin_leadership")
         else:
             p.setdefault("employee_count", None)
             p.setdefault("too_large", False)
@@ -238,6 +244,8 @@ def step_email(jobs: list[dict], dry_run: bool = False) -> None:
             p.setdefault("leadership", None)
             p.setdefault("repeat_hiring", None)
             p.setdefault("ai_mentions", [])
+            p.setdefault("hiring_velocity", None)
+            p.setdefault("linkedin_leadership", None)
 
     if dry_run:
         logger.info("DRY RUN — would send %d jobs:", len(pending))
@@ -286,6 +294,7 @@ def main() -> None:
     scored_jobs = step_score(new_jobs)
     enriched    = step_enrich(scored_jobs)
     signalled   = step_signals(enriched)
+    save_enrichment(signalled)        # persist enrichment to DB
     step_email(signalled, dry_run=args.dry_run)
 
     # Log to Google Sheets (non-blocking — failure won't break the run)

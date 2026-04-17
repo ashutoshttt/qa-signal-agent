@@ -52,6 +52,8 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
         "leadership": None,
         "repeat_hiring": None,
         "ai_mentions": [],
+        "hiring_velocity": None,
+        "linkedin_leadership": None,
     })
 
     for job in jobs:
@@ -86,6 +88,10 @@ def _group_jobs(jobs: list[dict]) -> list[dict]:
             g["leadership"] = job["leadership"]
         if job.get("repeat_hiring") and not g["repeat_hiring"]:
             g["repeat_hiring"] = job["repeat_hiring"]
+        if job.get("hiring_velocity") and not g["hiring_velocity"]:
+            g["hiring_velocity"] = job["hiring_velocity"]
+        if job.get("linkedin_leadership") and not g["linkedin_leadership"]:
+            g["linkedin_leadership"] = job["linkedin_leadership"]
         if job.get("product") and not g["product"]:
             g["product"] = job["product"]
         if job.get("ai_mentions"):
@@ -203,6 +209,24 @@ def _highlights_html(company_groups: list[dict]) -> str:
                 f'<span style="background:#e8daef;color:#6c3483;padding:2px 6px;'
                 f'border-radius:3px;font-size:11px;font-weight:600;">🚀 Product</span> '
                 f'<span style="font-size:12px;color:#555;">{g["product"][:90]}</span>'
+                f'</div>'
+            )
+
+        if g.get("hiring_velocity"):
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#e8f8f5;color:#1a7a4a;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">📈 Velocity</span> '
+                f'<span style="font-size:12px;color:#555;">{g["hiring_velocity"]}</span>'
+                f'</div>'
+            )
+
+        if g.get("linkedin_leadership"):
+            signal_lines.append(
+                f'<div style="margin-bottom:5px;">'
+                f'<span style="background:#fef5e4;color:#7d4800;padding:2px 6px;'
+                f'border-radius:3px;font-size:11px;font-weight:600;">🏗️ Leadership Open</span> '
+                f'<span style="font-size:12px;color:#555;">{g["linkedin_leadership"]}</span>'
                 f'</div>'
             )
 
@@ -384,6 +408,10 @@ def _build_text(jobs: list[dict]) -> str:
             lines.append(f"  👔 Leadership hiring: {g['leadership']}")
         if g.get("repeat_hiring"):
             lines.append(f"  🔁 Repeat hiring: {g['repeat_hiring']}")
+        if g.get("hiring_velocity"):
+            lines.append(f"  📈 Velocity: {g['hiring_velocity']}")
+        if g.get("linkedin_leadership"):
+            lines.append(f"  🏗️ Leadership open: {g['linkedin_leadership']}")
         if g.get("product"):
             lines.append(f"  🚀 Product: {g['product']}")
         if g.get("ai_mentions"):

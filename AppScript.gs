@@ -37,6 +37,8 @@ var HEADERS = [
   "AI Signal",
   "Leadership Hiring",
   "Repeat Hiring",
+  "Hiring Velocity",
+  "Leadership Open (Live)",
   "Contacts",
 ];
 
@@ -80,7 +82,9 @@ function getOrCreateSheet() {
     sheet.setColumnWidth(14, 300); // AI Signal
     sheet.setColumnWidth(15, 200); // Leadership
     sheet.setColumnWidth(16, 180); // Repeat Hiring
-    sheet.setColumnWidth(17, 280); // Contacts
+    sheet.setColumnWidth(17, 200); // Hiring Velocity
+    sheet.setColumnWidth(18, 220); // Leadership Open (Live)
+    sheet.setColumnWidth(19, 280); // Contacts
   }
 
   return sheet;
@@ -129,9 +133,11 @@ function doPost(e) {
         r.product_news  || "",
         r.tech_stack    || "",
         r.ai_signal     || "",
-        r.leadership    || "",
-        r.repeat_hiring || "",
-        r.contacts      || "",
+        r.leadership          || "",
+        r.repeat_hiring       || "",
+        r.hiring_velocity     || "",
+        r.linkedin_leadership || "",
+        r.contacts            || "",
       ];
 
       var lastRow = sheet.getLastRow() + 1;
@@ -175,6 +181,8 @@ function testSheet() {
     "We are building AI-first quality platform",
     "",
     "Hired QA 3 times in last 6 months",
+    "47+ open roles on LinkedIn (rapidly scaling)",
+    "Hiring: VP Engineering, Head of Product",
     "John Doe | QA Manager | john@testcompany.com"
   ];
 
