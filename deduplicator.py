@@ -201,9 +201,8 @@ def save_enrichment(jobs: list[dict]) -> None:
 
 def get_pending_digest() -> list[dict]:
     """
-    Return today's digest jobs: all high-score jobs (>=5) seen in the last 24h,
-    plus any older un-emailed jobs still waiting.
-    Ordered by score DESC.
+    Return only net-new jobs that haven't been emailed yet, ordered by score DESC.
+    Once a job is emailed it never appears again — keeps each day's digest fresh.
     """
     import json as _json
     with _get_conn() as conn:
@@ -215,7 +214,6 @@ def get_pending_digest() -> list[dict]:
                    repeat_hiring, contacts, hiring_velocity, linkedin_leadership
             FROM   jobs
             WHERE  emailed = 0
-               OR  (score >= 5 AND first_seen >= datetime('now', '-30 hours'))
             ORDER  BY score DESC, first_seen DESC
             """
         ).fetchall()
